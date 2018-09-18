@@ -7,7 +7,6 @@ import math
 
 latColumn = None
 lngColumn = None
-# listOfVendorPoints = []
 listOfPolygons = []
 vendorCodeAndPointsMap = {}
 foundPolygonSet = set()
@@ -34,13 +33,10 @@ def findNearestPolygon(f2, p):
 					vendorName = placemark.name
 	return (vendorName, minDistance)
 
-# kmlFilePath = sys.argv[1]
-# vendorCodeMappingFilePath = sys.argv[2]
-
-wb = xlrd.open_workbook('Sample data of vendor code and lat log.xlsx')
+wb = xlrd.open_workbook(sys.argv[2])
 sheet = wb.sheet_by_index(0)
 
-workBook = xlsxwriter.Workbook('demo1.xlsx')
+workBook = xlsxwriter.Workbook('mappingResult.xlsx')
 workSheet = workBook.add_worksheet()
 bold = workBook.add_format({'bold': True})
 
@@ -78,7 +74,7 @@ for i in range(sheet.nrows-1):
 	vendorCodeAndPointsMap[sheet.cell_value(i+1, 0)] = Point(sheet.cell_value(i+1, lngColumn), sheet.cell_value(i+1, latColumn))
 	# listOfVendorPoints.append(Point(sheet.cell_value(i+1, lngColumn), sheet.cell_value(i+1, latColumn)))
 
-with open('Collated.kml') as kmlFile:
+with open(sys.argv[1]) as kmlFile:
 	doc = kmlFile.read()
 
 k = kml.KML()
