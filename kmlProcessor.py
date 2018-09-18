@@ -2,6 +2,8 @@ from fastkml import kml
 from shapely.geometry import Point, Polygon
 import xlrd
 import xlsxwriter
+import sys
+import math
 
 latColumn = None
 lngColumn = None
@@ -23,17 +25,22 @@ def findNearestPolygon(f2, p):
 	minDistance = float("inf")
 	vendorName = None
 	for placemark in f2:
-		if placemark._geometry.geometry.geom_type == 'Polygon':
-			distance = placemark._geometry.geometry.exterior.distance(p)
-			if distance < minDistance:
-				minDistance = distance
-				vendorName = placemark.name
+		if placemark._geometry is not None:
+			if placemark._geometry.geometry.geom_type == 'Polygon':
+				distance = placemark._geometry.geometry.exterior.distance(p)
+				distance = ((distance)/360)*math.pi*12756.2
+				if distance < minDistance:
+					minDistance = distance
+					vendorName = placemark.name
 	return (vendorName, minDistance)
 
-wb = xlrd.open_workbook('latlng.xlsx')
+# kmlFilePath = sys.argv[1]
+# vendorCodeMappingFilePath = sys.argv[2]
+
+wb = xlrd.open_workbook('Sample data of vendor code and lat log.xlsx')
 sheet = wb.sheet_by_index(0)
 
-workBook = xlsxwriter.Workbook('demo.xlsx')
+workBook = xlsxwriter.Workbook('demo1.xlsx')
 workSheet = workBook.add_worksheet()
 bold = workBook.add_format({'bold': True})
 
@@ -60,7 +67,7 @@ for i in range(sheet.ncols):
 	columnHeader = sheet.cell_value(0,i).lower()
 	if columnHeader == 'lat' or columnHeader == 'latitude':
 		latColumn = i
-	if columnHeader == 'lng' or columnHeader == 'lon' or columnHeader == 'longitude':
+	if columnHeader == 'lng' or columnHeader == 'lon' or columnHeader == 'longitude' or columnHeader == 'log':
 		lngColumn = i
 
 print ('Column found for latitude: ' , latColumn)
@@ -71,33 +78,39 @@ for i in range(sheet.nrows-1):
 	vendorCodeAndPointsMap[sheet.cell_value(i+1, 0)] = Point(sheet.cell_value(i+1, lngColumn), sheet.cell_value(i+1, latColumn))
 	# listOfVendorPoints.append(Point(sheet.cell_value(i+1, lngColumn), sheet.cell_value(i+1, latColumn)))
 
-with open('Zones.kml') as kmlFile:
+with open('Collated.kml') as kmlFile:
 	doc = kmlFile.read()
 
 k = kml.KML()
 k.from_string(doc)
 f = list(k.features())
 f2 = list(f[0].features())
+f3 = []
+for folder in f2:
+	for placemark in folder.features():
+		f3.append(placemark)
 rowA = 1
 columnA = 0
 
 for key, value in vendorCodeAndPointsMap.items():
-	for placemark in f2:
-		if placemark._geometry.geometry.geom_type == 'Polygon':
-			if (placemark._geometry.geometry.contains(value)):
-				foundPolygonSet.add(key)
-				nearestEdgeDist = placemark._geometry.geometry.exterior.distance(value)
-				rowData = [key, value.y, value.x, 'Y', placemark.name, nearestEdgeDist, 'NA', 'NA']
-				for val in rowData:
-					workSheet.write(rowA, columnA, val)
-					columnA += 1
-				rowA += 1
-				columnA = 0
+	for placemark in f3:
+		if placemark._geometry is not None:
+			if placemark._geometry.geometry.geom_type == 'Polygon':
+				if (placemark._geometry.geometry.contains(value)):
+					foundPolygonSet.add(key)
+					nearestEdgeDist = placemark._geometry.geometry.exterior.distance(value)
+					nearestEdgeDist = ((nearestEdgeDist)/360)*math.pi*12756.2
+					rowData = [key, value.y, value.x, 'Y', placemark.name, nearestEdgeDist, 'NA', 'NA']
+					for val in rowData:
+						workSheet.write(rowA, columnA, val)
+						columnA += 1
+					rowA += 1
+					columnA = 0
 
 
 for key, value in vendorCodeAndPointsMap.items():
 	if(key not in foundPolygonSet):
-		(vendorName, nearestPolyDist) = findNearestPolygon(f2, value)
+		(vendorName, nearestPolyDist) = findNearestPolygon(f3, value)
 		rowData = [key, value.y, value.x, 'N', 'NA', 'NA', vendorName, nearestPolyDist]
 		for val in rowData:
 			workSheet.write(rowA, columnA, val)
@@ -105,4 +118,6 @@ for key, value in vendorCodeAndPointsMap.items():
 		rowA += 1
 		columnA = 0
 
+wb.release_resources()
+kmlFile.close()
 workBook.close()
